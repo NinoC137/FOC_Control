@@ -44,7 +44,15 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
-
+//uart input
+#define UARTBUFFER 100
+uint8_t uartBuffer[UARTBUFFER];
+float reformat[2];
+//hall sensor angle data
+extern int16_t angle;
+extern float angle_f;
+//Motor Mode
+uint8_t ModeFlag;
 /* USER CODE END Variables */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -84,5 +92,90 @@ void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer, StackTy
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
+void FOCTask(void const * argument){
+    int Motor_PP = 7;
+    int sensorDir = 1;
 
+    FOC_Vbus(12.0f);
+    FOC_alignSensor(Motor_PP, sensorDir);
+
+    for(;;){
+        switch (ModeFlag) {
+            case 0:
+                velocityOpenLoop(15);
+                break;
+
+            case 1:
+                break;
+
+            case 2:
+                break;
+
+            default:
+                break;
+        }
+        osDelay(1);
+    }
+}
+
+void SensorTask(void const * argument){
+
+    for(;;){
+//        i2c_mt6701_get_angle(&angle, &angle_f);
+//        uart_printf("hall data: %f\r\n", angle_f);
+        osDelay(500);
+    }
+}
+
+void ModeSwitchTask(void const * argument){
+    for(;;){
+        osDelay(500);
+    }
+}
+
+void UARTTask(void const * argument){
+    int i;
+    int array_empty_flag = 1;
+
+    uart_printf("**********************************************************************   \r\n");
+    uart_printf("Nino FOC      ---     BLDC   \r\n");
+    uart_printf("Motor Mode switch:   \r\n");
+    uart_printf("input Mode ID   \r\n");
+    uart_printf("Mode 1: OpenLoop\t\t\targument: speed(-30~30)   \r\n");
+    uart_printf("Mode 2: Feedback Speed Control\t\targument: speed(-30~30)   \r\n");
+    uart_printf("Mode 3: Angle Control\t\t\targument: angle(0~2pi)   \r\n");
+    uart_printf("Mode 4: Gear Mode \t\t\targument: Gear Number(2~6)   \r\n");
+    uart_printf("Mode 5: Without damp\t\t\targument: NULL   \r\n");
+    uart_printf("Mode 6: Damp\t\t\t\targument: damp value(1~10)   \r\n");
+    uart_printf("**********************************************************************   \r\n");
+
+    for (;;) {
+        HAL_UART_Receive_DMA(&huart1, &uartBuffer[0], UARTBUFFER);
+        for (i = 0; i < UARTBUFFER; i++) {
+            if (uartBuffer[i] != 0) {
+                array_empty_flag = 0;
+                break;
+            }
+        }
+        if (array_empty_flag == 0) {
+            array_empty_flag = 1;
+
+//            uart_printf("User String: %s\r\n", uartBuffer);
+
+            /*
+             * example:
+             * input: x:+001,y:-010,
+             * output: reformat[0] = 1, reformat[1] = -10
+             * */
+            ReformatBuffer(uartBuffer, reformat);
+            ModeFlag = (uint8_t)reformat[0];
+
+            uart_printf("Mode: %d\targument: %0.2f\r\n",ModeFlag, reformat[1]);
+
+            memset(uartBuffer, 0, UARTBUFFER);
+            HAL_UART_DMAStop(&huart1);
+        }
+        osDelay(100);
+    }
+}
 /* USER CODE END Application */

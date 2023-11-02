@@ -2,17 +2,17 @@
 
 unsigned char mt6701_write_reg(unsigned char reg, unsigned char value)
 {
-    return HAL_I2C_Mem_Write(&hi2c1, MT6701_SLAVE_ADDR, reg, I2C_MEMADD_SIZE_8BIT, &value, 1, MT6701_Timeout);
+    return HAL_I2C_Mem_Write(&hi2c2, MT6701_SLAVE_ADDR, reg, I2C_MEMADD_SIZE_8BIT, &value, 1, MT6701_Timeout);
 }
 
 unsigned char mt6701_write_regs(unsigned char reg, unsigned char *value, unsigned char len)
 {
-    return HAL_I2C_Mem_Write(&hi2c1, MT6701_SLAVE_ADDR, reg, I2C_MEMADD_SIZE_8BIT, value, len, MT6701_Timeout);
+    return HAL_I2C_Mem_Write(&hi2c2, MT6701_SLAVE_ADDR, reg, I2C_MEMADD_SIZE_8BIT, value, len, MT6701_Timeout);
 }
 
 unsigned char mt6701_read_reg(unsigned char reg, unsigned char* buf, unsigned short len)
 {
-    return HAL_I2C_Mem_Read(&hi2c1, MT6701_SLAVE_ADDR, reg, I2C_MEMADD_SIZE_8BIT, buf, len, MT6701_Timeout);
+    return HAL_I2C_Mem_Read(&hi2c2, MT6701_SLAVE_ADDR, reg, I2C_MEMADD_SIZE_8BIT, buf, len, MT6701_Timeout);
 }
 
 void mt6701_delay(unsigned int ms)

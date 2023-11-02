@@ -79,7 +79,7 @@ void FOC_alignSensor(int _PP, int _DIR) {
     zero_electric_angle = _electricalAngle_FeedBack();
     setTorque(0, _3PI_2);  //松劲（解除校准）
 
-    uart_printf("0电角度：%f\r\n", zero_electric_angle);
+    uart_printf("zero electric angle: %f\r\n", zero_electric_angle);
 }
 
 float DFOC_M0_Velocity() {

@@ -33,11 +33,12 @@ extern "C" {
 /* USER CODE BEGIN Includes */
 #include "retarget.h"
 #include "FOC.h"
+#include "cmsis_os.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-
+extern UART_HandleTypeDef huart1;
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -51,7 +52,7 @@ extern TIM_HandleTypeDef htim3;
 extern TIM_HandleTypeDef htim4;
 extern TIM_HandleTypeDef htim5;
 
-extern I2C_HandleTypeDef hi2c1;
+extern I2C_HandleTypeDef hi2c2;
 /* USER CODE END EM */
 
 void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
@@ -81,6 +82,8 @@ void Error_Handler(void);
 #define CS_GPIO_Port GPIOB
 #define BLK_Pin GPIO_PIN_7
 #define BLK_GPIO_Port GPIOE
+#define FOC_EN_Pin GPIO_PIN_0
+#define FOC_EN_GPIO_Port GPIOE
 
 /* USER CODE BEGIN Private defines */
 
