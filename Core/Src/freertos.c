@@ -61,19 +61,19 @@ uint8_t ModeFlag;
 /* USER CODE END FunctionPrototypes */
 
 /* GetIdleTaskMemory prototype (linked to static allocation support) */
-void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize );
+void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer,
+                                   uint32_t *pulIdleTaskStackSize);
 
 /* Hook prototypes */
 void vApplicationTickHook(void);
 
 /* USER CODE BEGIN 3 */
-__weak void vApplicationTickHook( void )
-{
-   /* This function will be called by each tick interrupt if
-   configUSE_TICK_HOOK is set to 1 in FreeRTOSConfig.h. User code can be
-   added here, but the tick hook is called from an interrupt context, so
-   code must not attempt to block, and only the interrupt safe FreeRTOS API
-   functions can be used (those that end in FromISR()). */
+__weak void vApplicationTickHook(void) {
+    /* This function will be called by each tick interrupt if
+    configUSE_TICK_HOOK is set to 1 in FreeRTOSConfig.h. User code can be
+    added here, but the tick hook is called from an interrupt context, so
+    code must not attempt to block, and only the interrupt safe FreeRTOS API
+    functions can be used (those that end in FromISR()). */
 }
 /* USER CODE END 3 */
 
@@ -81,34 +81,38 @@ __weak void vApplicationTickHook( void )
 static StaticTask_t xIdleTaskTCBBuffer;
 static StackType_t xIdleStack[configMINIMAL_STACK_SIZE];
 
-void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize )
-{
-  *ppxIdleTaskTCBBuffer = &xIdleTaskTCBBuffer;
-  *ppxIdleTaskStackBuffer = &xIdleStack[0];
-  *pulIdleTaskStackSize = configMINIMAL_STACK_SIZE;
-  /* place for user code */
+void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer,
+                                   uint32_t *pulIdleTaskStackSize) {
+    *ppxIdleTaskTCBBuffer = &xIdleTaskTCBBuffer;
+    *ppxIdleTaskStackBuffer = &xIdleStack[0];
+    *pulIdleTaskStackSize = configMINIMAL_STACK_SIZE;
+    /* place for user code */
 }
 /* USER CODE END GET_IDLE_TASK_MEMORY */
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
-void FOCTask(void const * argument){
+void FOCTask(void const *argument) {
     int Motor_PP = 7;
     int sensorDir = 1;
 
     FOC_Vbus(12.0f);
     FOC_alignSensor(Motor_PP, sensorDir);
 
-    for(;;){
+    for (;;) {
         switch (ModeFlag) {
-            case 0:
-                velocityOpenLoop(15);
-                break;
-
             case 1:
+                if (reformat[1] > 30 || reformat[1] < -30) {
+                    uart_printf("argument error!\r\n");
+                    reformat[1] = 0.00f;
+                } else
+                    velocityOpenLoop(reformat[1]);
                 break;
 
             case 2:
+                break;
+
+            case 3:
                 break;
 
             default:
@@ -118,29 +122,30 @@ void FOCTask(void const * argument){
     }
 }
 
-void SensorTask(void const * argument){
+void SensorTask(void const *argument) {
 
-    for(;;){
+    for (;;) {
 //        i2c_mt6701_get_angle(&angle, &angle_f);
 //        uart_printf("hall data: %f\r\n", angle_f);
         osDelay(500);
     }
 }
 
-void ModeSwitchTask(void const * argument){
-    for(;;){
+void ModeSwitchTask(void const *argument) {
+    for (;;) {
         osDelay(500);
     }
 }
 
-void UARTTask(void const * argument){
+void UARTTask(void const *argument) {
     int i;
     int array_empty_flag = 1;
 
     uart_printf("**********************************************************************   \r\n");
     uart_printf("Nino FOC      ---     BLDC   \r\n");
+    uart_printf("input example: \r\n");
+    uart_printf("               x:+001,y:+020,\r\n");
     uart_printf("Motor Mode switch:   \r\n");
-    uart_printf("input Mode ID   \r\n");
     uart_printf("Mode 1: OpenLoop\t\t\targument: speed(-30~30)   \r\n");
     uart_printf("Mode 2: Feedback Speed Control\t\targument: speed(-30~30)   \r\n");
     uart_printf("Mode 3: Angle Control\t\t\targument: angle(0~2pi)   \r\n");
@@ -168,9 +173,9 @@ void UARTTask(void const * argument){
              * output: reformat[0] = 1, reformat[1] = -10
              * */
             ReformatBuffer(uartBuffer, reformat);
-            ModeFlag = (uint8_t)reformat[0];
+            ModeFlag = (uint8_t) reformat[0];
 
-            uart_printf("Mode: %d\targument: %0.2f\r\n",ModeFlag, reformat[1]);
+            uart_printf("Mode: %d\targument: %0.2f\r\n", ModeFlag, reformat[1]);
 
             memset(uartBuffer, 0, UARTBUFFER);
             HAL_UART_DMAStop(&huart1);
