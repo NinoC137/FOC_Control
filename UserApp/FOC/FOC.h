@@ -11,6 +11,8 @@
 #define _3PI_2 4.71238898038f
 
 #include "pid.h"
+#include "my_PID.h"
+#include "Filter.h"
 #include "lowpassFilter.h"
 
 //传感器读取
@@ -24,7 +26,6 @@ float DFOC_M0_ANGLE_PID(float error);
 
 //电角度求解
 float _electricalAngle(float shaft_angle, int pole_pairs);
-float _electricalAngle_FeedBack();
 //角度归一化
 float _normalizeAngle(float angle);
 //输出PWM

@@ -82,23 +82,6 @@ void ReformatBuffer(uint8_t *buffer, float *afterReformat) {
                 }
             }
         }
-        if(afterReformat[0] > 200)
-        {
-            afterReformat[0] = temp_1;
-        }else if(afterReformat[0] < -200)
-        {
-            afterReformat[0] = temp_1;
-        }else
-        temp_1 = afterReformat[0];
-        if(afterReformat[1] > 200)
-        {
-            afterReformat[1] = temp_2;
-        }else if(afterReformat[1] < -200)
-        {
-            afterReformat[1] = temp_2;
-        }else
-        temp_2 = afterReformat[1];
-        //printf("get a,b,c\r\n");
     }
 
 }

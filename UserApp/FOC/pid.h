@@ -14,7 +14,7 @@ typedef struct {
     float error_prev; // 最后的跟踪误差值
     float output_prev;  // 最后一个 pid 输出值
     float integral_prev; // 最后一个积分分量值
-    unsigned long timestamp_prev; // 上次执行时间戳
+//    unsigned long timestamp_prev; // 上次执行时间戳
 } PIDController;
 
 PIDController* PIDController_create(float P, float I, float D, float ramp, float limit);

@@ -1,55 +1,58 @@
 #include "FOC.h"
 #include "cmsis_os.h"
 
-#define _constrain(amt, low, high) ((amt)<(low)?:(amt)>(high)?(high):(amt))
+#define _constrain(amt, low, high) ((amt)<(low)?(low):((amt)>(high)?(high):(amt)))
 
 float shaft_angle = 0.0f, open_loop_timestamp = 0.0f;
 float zero_electric_angle = 0.0f;
 float voltage_power_supply = 12.0f;
-float Ualpha = 0.0f, Ubeta = 0.0f;
-float Ua, Ub, Uc, dc_a, dc_b, dc_c;
+//float Ualpha = 0.0f, Ubeta = 0.0f;
+//float Ua, Ub, Uc, dc_a, dc_b, dc_c;
 
-float PP, DIR = 1;
+int PP, DIR;
 
 //传感器数值
-int16_t angle;
+float angle_pi;
 float angle_f;
 
-//低通滤波初始化
-LowPassFilter* M0_Vel_Flt; // Tf = 10ms   //M0速度环
+LowPassFilter filter = {.Tf=0.01f, .y_prev=0.0f}; //Tf=10ms
+PIDController pid_controller = {.P=0.2f, .I=0.1f, .D=0.0f, .output_ramp=100.0f, .limit=6, .error_prev=0, .output_prev=0, .integral_prev=0};
 
 //PID
-PIDController* vel_loop_M0;
-PIDController* angle_loop_M0;
+PIDController *vel_loop_M0;
+PIDController *angle_loop_M0;
 
 //===================================PID 设置函数=========================================
-//速度PID
-void DFOC_M0_SET_VEL_PID(float P, float I, float D, float ramp)   //M0角度环PID设置
-{
-    vel_loop_M0->P = P;
-    vel_loop_M0->I = I;
-    vel_loop_M0->D = D;
-    vel_loop_M0->output_ramp = ramp;
-}
-
-//角度PID
-void DFOC_M0_SET_ANGLE_PID(float P, float I, float D, float ramp)   //M0角度环PID设置
-{
-    angle_loop_M0->P = P;
-    angle_loop_M0->I = I;
-    angle_loop_M0->D = D;
-    angle_loop_M0->output_ramp = ramp;
-}
+////速度PID
+//void DFOC_M0_SET_VEL_PID(float P, float I, float D, float ramp)   //M0角度环PID设置
+//{
+//    vel_loop_M0->P = P;
+//    vel_loop_M0->I = I;
+//    vel_loop_M0->D = D;
+//    vel_loop_M0->output_ramp = ramp;
+//}
+//
+////角度PID
+//void DFOC_M0_SET_ANGLE_PID(float P, float I, float D, float ramp)   //M0角度环PID设置
+//{
+//    angle_loop_M0->P = P;
+//    angle_loop_M0->I = I;
+//    angle_loop_M0->D = D;
+//    angle_loop_M0->output_ramp = ramp;
+//}
 
 //M0速度PID接口
 float DFOC_M0_VEL_PID(float error)   //M0速度环
 {
-    return PIDController_process(vel_loop_M0, error);
+//    Motor_1.Error = error;
+    Motor_1.Error = Low_Pass_Filter(&lpf_Motor1_error, error, 0.7f);
+    return Position_Pid_Calculate(&Motor_1);
 }
 
 //M0角度PID接口
 float DFOC_M0_ANGLE_PID(float error) {
-    return PIDController_process(angle_loop_M0, error);
+    Motor_1.Error = Low_Pass_Filter(&lpf_Motor1_error, error, 0.7f);
+    return Position_Pid_Calculate(&Motor_1);
 }
 //=====================================================================================
 
@@ -60,13 +63,9 @@ void FOC_Vbus(float _Vbus) {
     HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2);
     HAL_TIM_PWM_Start(&htim5, TIM_CHANNEL_3);
 
-    //PID 加载
-    vel_loop_M0 = PIDController_create(2, 0, 0, 100000, voltage_power_supply / 2);
-    //低通滤波初始化
-    M0_Vel_Flt = LowPassFilter_create(0.01); // Tf = 10ms   //M0速度环
-    //PID
-    vel_loop_M0 = PIDController_create(2, 0, 0, 100000, voltage_power_supply / 2);
-    angle_loop_M0 = PIDController_create(2, 0, 0, 100000, 100);
+//    struct LowPassFilter filter= {.Tf=0.01,.y_prev=0.0f}; //Tf=10ms
+//    struct PIDController pid_controller = {.P=0.5,.I=0.1,.D=0.0,.output_ramp=100.0,.limit=6,.error_prev=0,.output_prev=0,.integral_prev=0};
+
 }
 
 void FOC_alignSensor(int _PP, int _DIR) {
@@ -75,8 +74,8 @@ void FOC_alignSensor(int _PP, int _DIR) {
 
     setTorque(3, _3PI_2);  //起劲
     HAL_Delay(1000);
-    i2c_mt6701_get_angle(&angle, &angle_f); //更新传感器数值
-    zero_electric_angle = _electricalAngle_FeedBack();
+    i2c_mt6701_get_angle(&angle_pi, &angle_f); //更新传感器数值
+    zero_electric_angle = _electricalAngle(angle_pi, (int) PP);
     setTorque(0, _3PI_2);  //松劲（解除校准）
 
     uart_printf("zero electric angle: %f\r\n", zero_electric_angle);
@@ -85,46 +84,56 @@ void FOC_alignSensor(int _PP, int _DIR) {
 float DFOC_M0_Velocity() {
     static float angle_now, angle_old;
     static long sampleTimeStamp;
-    i2c_mt6701_get_angle(&angle, &angle_f); //更新传感器数值
+    i2c_mt6701_get_angle(&angle_pi, &angle_f); //更新传感器数值
     sampleTimeStamp = osKernelSysTick();
-    angle_now = angle_f;
+    angle_now = angle_pi;
 
-    float vel_speed_ori = (angle_now - angle_old) / sampleTimeStamp * 1e3;  //采样时间以ms为单位, 乘1e3后为每秒的角速度
+    float delta_angle = angle_now - angle_old;
+    if (delta_angle >= 1.6 * M_PI) {
+        delta_angle -= 2.0f * M_PI;
+    }
+    if (delta_angle <= -1.6 * M_PI) {
+        delta_angle += 2.0f * M_PI;
+    }
+
+    float vel_speed_ori = delta_angle / 3e-3;  //采样时间以3ms为单位, 乘1e3后为每秒的角速度
 
     angle_old = angle_now;
 
-    float vel_M0_flit = LowPassFilter_process(M0_Vel_Flt, DIR * vel_speed_ori);
+    float vel_M0_flit = LowPassFilter_process(&filter, DIR * vel_speed_ori);
+//    Motor_1.Actual = vel_M0_flit;
 
     return vel_M0_flit;
 }
 
 float DFOC_M0_Angle() {
-    i2c_mt6701_get_angle(&angle, &angle_f);
-    return DIR * angle_f;
+    i2c_mt6701_get_angle(&angle_pi, &angle_f);
+    return DIR * angle_pi;
 }
 
 //电角度求解
 float _electricalAngle(float shaft_angle, int pole_pairs) {
-    return (shaft_angle * pole_pairs);
-}
-
-float _electricalAngle_FeedBack() {
-    i2c_mt6701_get_angle(&angle, &angle_f); //更新传感器数值
-    return _normalizeAngle((float) (DIR * PP) * angle_f - zero_electric_angle);
+//    return (shaft_angle * pole_pairs);
+    return _normalizeAngle(((float)(DIR * pole_pairs)*shaft_angle)-zero_electric_angle);
 }
 
 //角度归一化
 float _normalizeAngle(float angle) {
-    float a = (float) fmod(angle, 2 * PI);
-    return a > 0 ? a : (float) (a + 2 * PI);
+    float a = fmod(angle, 2*PI);
+    return a >= 0 ? a : (a + 2*PI);
 }
 
 //输出PWM
 void setPWM(float Ua, float Ub, float Uc) {
+    // 限制上限
+    Ua = _constrain(Ua, 0.0f, voltage_power_supply);
+    Ub = _constrain(Ub, 0.0f, voltage_power_supply);
+    Uc = _constrain(Uc, 0.0f, voltage_power_supply);
+
     //计算占空比, 并限制其在0~1
-    dc_a = _constrain(Ua / voltage_power_supply, 0.0f, 1.0f);
-    dc_b = _constrain(Ub / voltage_power_supply, 0.0f, 1.0f);
-    dc_c = _constrain(Uc / voltage_power_supply, 0.0f, 1.0f);
+    float dc_a = _constrain(Ua / voltage_power_supply, 0.0f, 1.0f);
+    float dc_b = _constrain(Ub / voltage_power_supply, 0.0f, 1.0f);
+    float dc_c = _constrain(Uc / voltage_power_supply, 0.0f, 1.0f);
 
     //写入PWM通道
             __HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_1, dc_a * htim3.Init.Period);
@@ -133,35 +142,33 @@ void setPWM(float Ua, float Ub, float Uc) {
 }
 
 void setTorque(float Uq, float angle_el) {
-    i2c_mt6701_get_angle(&angle, &angle_f); //更新传感器数值
-
-    Uq = _constrain(Uq, -(voltage_power_supply) / 2, (voltage_power_supply) / 2);
+    Uq = _constrain(Uq, -(voltage_power_supply) / 3, (voltage_power_supply) / 3);   //力矩限制, 限定为上限电压的五分之一, 保证安全性
 
     angle_el = _normalizeAngle(angle_el);
 
     // 帕克逆变换
-    Ualpha = -Uq * sin(angle_el);
-    Ubeta = Uq * cos(angle_el);
+    float Ualpha = -Uq * (float) sin(angle_el);
+    float Ubeta = Uq * (float) cos(angle_el);
 
     //克拉克逆变换
-    Ua = Ualpha + voltage_power_supply / 2;
-    Ub = (float) (sqrt(3) * Ubeta - Ualpha) / 2 + voltage_power_supply / 2;
-    Uc = (float) (-Ualpha - sqrt(3) * Ubeta) / 2 + voltage_power_supply / 2;
+    float Ua = Ualpha + voltage_power_supply / 2;
+    float Ub = (float) (sqrt(3) * Ubeta - Ualpha) / 2 + voltage_power_supply / 2;
+    float Uc = (float) (-Ualpha - sqrt(3) * Ubeta) / 2 + voltage_power_supply / 2;
 
     setPWM(Ua, Ub, Uc);
 }
 
 //设置相电压
 void setPhaseVoltage(float Uq, float Ud, float angle_elec) {
-    angle_elec = _normalizeAngle(angle_elec + zero_electric_angle);
-    //帕克逆变换
-    Ualpha = -Uq * (float) sin(angle_elec);
-    Ubeta = Uq * cos(angle_elec);
+    angle_elec = _normalizeAngle(angle_elec);
+    // 帕克逆变换
+    float Ualpha = -Uq * sin(angle_elec);
+    float Ubeta = Uq * cos(angle_elec);
 
-    //克拉克逆变换
-    Ua = Ualpha + voltage_power_supply / 2;
-    Ub = (float) (sqrt(3) * Ubeta - Ualpha) / 2 + voltage_power_supply / 2;
-    Uc = (float) (-Ualpha - sqrt(3) * Ubeta) / 2 + voltage_power_supply / 2;
+    // 克拉克逆变换
+    float Ua = Ualpha + voltage_power_supply / 2;
+    float Ub = (sqrt(3) * Ubeta - Ualpha) / 2 + voltage_power_supply / 2;
+    float Uc = (-Ualpha - sqrt(3) * Ubeta) / 2 + voltage_power_supply / 2;
 
     setPWM(Ua, Ub, Uc);
 }
@@ -184,7 +191,7 @@ float velocityOpenLoop(float target_velocity) {
 
     // 使用早前设置的voltage_power_supply的1/3作为Uq值，这个值会直接影响输出力矩
     // 最大只能设置为Uq = voltage_power_supply/2，否则ua,ub,uc会超出供电电压限幅
-    float Uq = voltage_power_supply / 10.0f;
+    float Uq = voltage_power_supply / 8.0f;
 
     setPhaseVoltage(Uq, 0, _electricalAngle(shaft_angle, 7));
 
@@ -195,20 +202,27 @@ float velocityOpenLoop(float target_velocity) {
 
 //================简易接口函数================
 void FOC_M0_set_Velocity_Angle(float Target) {
-    setTorque(DFOC_M0_VEL_PID(DFOC_M0_ANGLE_PID((Target - DFOC_M0_Angle()) * 180 / PI)),
-              _electricalAngle_FeedBack());   //角度闭环
+    i2c_mt6701_get_angle(&angle_pi, &angle_f);
+    float angle_error = Target / 180.0f * M_PI - angle_pi * DIR;
+
+    if(angle_error > M_PI){
+        angle_error -= M_PI_2;
+    }
+
+    setTorque(_constrain( DFOC_M0_ANGLE_PID(angle_error) * 180.0f / PI , Motor_1.OutputMin, Motor_1.OutputMax),
+    _electricalAngle(angle_pi, PP));   //角度闭环
 }
 
 void FOC_M0_setVelocity(float Target) {
-    setTorque(DFOC_M0_VEL_PID((Target * DFOC_M0_Velocity()) * 180 / PI), _electricalAngle_FeedBack());   //速度闭环
+    Motor_1.Target = Target;
+    setTorque(DFOC_M0_VEL_PID((Target - DFOC_M0_Velocity()) * 180 / PI), _electricalAngle(angle_pi, PP));   //速度闭环
 }
 
 void FOC_M0_set_Force_Angle(float Target)   //力位
 {
-    setTorque(DFOC_M0_ANGLE_PID((Target - DFOC_M0_Angle()) * 180 / PI), _electricalAngle_FeedBack());
+    setTorque(DFOC_M0_ANGLE_PID((Target - DFOC_M0_Angle()) * 180 / PI), _electricalAngle(angle_pi, PP));
 }
 
-void FOC_M0_setTorque(float Target)
-{
-    setTorque(Target, _electricalAngle_FeedBack());
+void FOC_M0_setTorque(float Target) {
+    setTorque(Target, _electricalAngle(Motor_1.Error, PP));
 }

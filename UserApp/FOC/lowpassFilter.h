@@ -16,7 +16,7 @@ extern "C" {
 
 typedef struct {
     float Tf;                  // 低通滤波时间常数
-    uint32_t timestamp_prev;    // 最后执行时间戳
+//    uint32_t timestamp_prev;    // 最后执行时间戳
     float y_prev;               // 上一个循环中的过滤后的值
 } LowPassFilter;
 

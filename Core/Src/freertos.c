@@ -34,7 +34,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define _constrain(amt, low, high) ((amt)<(low)?(low):((amt)>(high)?(high):(amt)))
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -49,8 +49,9 @@
 uint8_t uartBuffer[UARTBUFFER];
 float reformat[2];
 //hall sensor angle data
-extern int16_t angle;
+extern float angle_pi;
 extern float angle_f;
+extern float zero_electric_angle;
 //Motor Mode
 uint8_t ModeFlag;
 /* USER CODE END Variables */
@@ -61,8 +62,7 @@ uint8_t ModeFlag;
 /* USER CODE END FunctionPrototypes */
 
 /* GetIdleTaskMemory prototype (linked to static allocation support) */
-void vApplicationGetIdleTaskMemory(StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer,
-                                   uint32_t *pulIdleTaskStackSize);
+void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer, StackType_t **ppxIdleTaskStackBuffer, uint32_t *pulIdleTaskStackSize );
 
 /* Hook prototypes */
 void vApplicationTickHook(void);
@@ -99,20 +99,32 @@ void FOCTask(void const *argument) {
     FOC_Vbus(12.0f);
     FOC_alignSensor(Motor_PP, sensorDir);
 
+    Pid_Value_Init();
+    Motor_1.OutputMax = 3.0;
+    Motor_1.OutputMin = -3.0;
+    Motor_1.IntegralMax = 1.0f;
+
     for (;;) {
         switch (ModeFlag) {
             case 1:
                 if (reformat[1] > 30 || reformat[1] < -30) {
-                    uart_printf("argument error!\r\n");
-                    reformat[1] = 0.00f;
+                    uart_printf("argument error! Set speed to 1 rad/s\r\n");
+                    reformat[1] = 1.00f;
                 } else
                     velocityOpenLoop(reformat[1]);
                 break;
 
             case 2:
+                if (reformat[1] > 30 || reformat[1] < -30) {
+                    uart_printf("argument error! Set speed to 1 rad/s\r\n");
+                    reformat[1] = 1.00f;
+                } else
+                    FOC_M0_setVelocity(reformat[1]);
                 break;
 
             case 3:
+                FOC_M0_set_Velocity_Angle(reformat[1]);
+                uart_printf("%f,%f\r\n", angle_pi, reformat[1]/180.0f*PI);
                 break;
 
             default:
@@ -127,6 +139,10 @@ void SensorTask(void const *argument) {
     for (;;) {
 //        i2c_mt6701_get_angle(&angle, &angle_f);
 //        uart_printf("hall data: %f\r\n", angle_f);
+
+//        uart_printf("Actual Speed: %f\r\n", Motor_1.Actual);
+//        uart_printf("Sensor Angle: %f\r\n", angle_f);
+
         osDelay(500);
     }
 }
