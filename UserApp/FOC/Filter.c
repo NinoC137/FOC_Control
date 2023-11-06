@@ -6,6 +6,10 @@ Sliding_Mean_Filter moving_filter;
 LowPass_Filter lpf_Motor1_error;
 LowPass_Filter lpf_Motor1_speed;
 
+LowPass_Filter lpf_Motor1_current;
+LowPass_Filter lpf_current_d;
+LowPass_Filter lpf_current_q;
+
 /**
  ** 函数功能:  一阶滞后滤波算法，Bias滤波器
  ** 参    数: value：需要进行滤波的值

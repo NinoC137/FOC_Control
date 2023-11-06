@@ -33,6 +33,8 @@ typedef struct
 }PID;
 
 extern PID Motor_1;
+extern PID Motor_Uq;
+extern PID Motor_Ud;
 
 void Pid_Value_Init(void);
 void Pid_Init(PID *param,float Kp_Init,float Ki_Init,float Kd_Init);

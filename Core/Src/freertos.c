@@ -124,7 +124,7 @@ void FOCTask(void const *argument) {
 
             case 3:
                 FOC_M0_set_Velocity_Angle(reformat[1]);
-                uart_printf("%f,%f\r\n", angle_pi, reformat[1]/180.0f*PI);
+                uart_printf("%f,%f\r\n", angle_pi, reformat[1]/180.0f*_PI);
                 break;
 
             default:
@@ -188,10 +188,13 @@ void UARTTask(void const *argument) {
              * input: x:+001,y:-010,
              * output: reformat[0] = 1, reformat[1] = -10
              * */
+            portENTER_CRITICAL();
             ReformatBuffer(uartBuffer, reformat);
             ModeFlag = (uint8_t) reformat[0];
 
             uart_printf("Mode: %d\targument: %0.2f\r\n", ModeFlag, reformat[1]);
+            reformat[1] = reformat[1] / 180.0f * M_PI;  //转化为弧度制单位
+            portEXIT_CRITICAL();
 
             memset(uartBuffer, 0, UARTBUFFER);
             HAL_UART_DMAStop(&huart1);

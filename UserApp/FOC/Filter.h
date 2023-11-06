@@ -46,6 +46,10 @@ typedef struct
 extern LowPass_Filter lpf_Motor1_error;
 extern LowPass_Filter lpf_Motor1_speed;
 
+extern LowPass_Filter lpf_Motor1_current;
+extern LowPass_Filter lpf_current_d;
+extern LowPass_Filter lpf_current_q;
+
 float Low_Pass_Filter(LowPass_Filter *filter,float data,float param);
 
 typedef struct

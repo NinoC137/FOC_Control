@@ -29,5 +29,5 @@ void i2c_mt6701_get_angle(float *angle_pi, float *angle_f)
 
     angle = ((int16_t)temp[0] << 6) | (temp[1] >> 2);
     *angle_f = (float)angle * 360 / 16384;
-    *angle_pi = *angle_f / 360.0f * 2.0f * PI;
+    *angle_pi = *angle_f / 360.0f * 2.0f * _PI;
 }

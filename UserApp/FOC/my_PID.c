@@ -2,6 +2,9 @@
 
 PID Motor_1;
 
+PID Motor_Uq;
+PID Motor_Ud;
+
 /*************************************************************************
 *  函数名称：Pid_Value_Init()
 *  功能说明：直接给PID系数赋值，用于软件保存PID参数
@@ -13,6 +16,14 @@ PID Motor_1;
 void Pid_Value_Init(void)
 {
     Pid_Init(&Motor_1, 0.06f, 0.0005f, 0.00f);
+    Pid_Init(&Motor_Uq, 0.004f, 0.00f, 0.00f);
+    Motor_Uq.OutputMax = 3.0f;
+    Motor_Uq.OutputMin = -3.0f;
+    Motor_Uq.IntegralMax = 200.0f;
+    Pid_Init(&Motor_Ud, 0.004f, 0.00f, 0.00f);
+    Motor_Ud.OutputMax = 3.0f;
+    Motor_Ud.OutputMin = -3.0f;
+    Motor_Ud.IntegralMax = 200.0f;
 }
 
 /*************************************************************************
